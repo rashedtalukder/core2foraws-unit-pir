@@ -1,16 +1,27 @@
-# M5Stack PIR Motion Sensor Unit ESP-IDF Component for the Core2 for AWS IoT
+# M5Stack PIR Motion Sensor Unit — ESP-IDF Component for the Core2 for AWS IoT Kit
 
-This is a component library for use with the M5Stack PIR motion sensor unit connected to Port B (GPIO 36) on the Core2 for AWS IoT Kit. Uses the digital read abstractions built in to the [BSP for the Core2 for AWS](https://github.com/m5stack/Core2-for-AWS-IoT-Kit/tree/BSP-dev).
+ESP-IDF component driver for the [M5Stack PIR motion sensor unit](https://docs.m5stack.com/en/unit/pir) (AS312-based) connected to **Port B** (GPIO 36) on the M5Stack Core2 for AWS IoT Kit. Uses the digital read abstractions built in to the [Core2 for AWS BSP](https://github.com/m5stack/Core2-for-AWS-IoT-Kit/tree/BSP-dev).
 
-For official documentation and specifications, see the [M5Stack PIR Unit documentation](https://docs.m5stack.com/en/unit/pir).
+## How It Works
 
-## Features
+The PIR (Passive Infrared) unit contains an AS312 sensor that detects infrared radiation changes caused by moving warm objects (people, animals). It outputs a simple digital signal:
 
-- Simple digital motion detection
-- Direct GPIO reading without state management
-- Thread-safe initialization and reading
-- Minimal memory footprint
-- Easy integration with existing applications
+- **HIGH (1)** — motion detected
+- **LOW (0)** — no motion detected
+
+After detecting motion, the sensor holds its output HIGH for approximately **2 seconds** before returning LOW (if no further motion occurs). The detection range is approximately **3 meters** with a **100° cone** field of view.
+
+## Hardware Connection
+
+Plug the PIR unit into **Port B** (black Grove connector) on the Core2 for AWS IoT Kit:
+
+| PIR Unit Pin | Core2 Port B Pin |
+|-------------|------------------|
+| Signal      | GPIO 36 (input-only) |
+| VCC         | 5V               |
+| GND         | GND              |
+
+> **Note:** GPIO 36 is an input-only pin on the ESP32, which is ideal for reading sensor outputs.
 
 ## Usage
 
@@ -21,8 +32,8 @@ For official documentation and specifications, see the [M5Stack PIR Unit documen
 esp_err_t err = unit_pir_init();
 if (err == ESP_OK) {
     bool motion = false;
-    
-    // Read current motion state (returns immediate sensor reading)
+
+    // Read current motion state
     err = unit_pir_read(&motion);
     if (err == ESP_OK && motion) {
         printf("Motion detected!\n");
@@ -35,50 +46,54 @@ unit_pir_deinit();
 
 ## API Reference
 
-### Functions
+### `unit_pir_init()`
 
-- `unit_pir_init()` - Initialize the PIR sensor on GPIO 36
-- `unit_pir_read(bool *motion_detected)` - Read current motion state
-- `unit_pir_deinit()` - Deinitialize and reset GPIO
+Configures GPIO 36 as a digital input and verifies the pin can be read.
 
-### Behavior
+**Returns:** `ESP_OK` on success, `ESP_ERR_INVALID_STATE` if GPIO setup fails.
 
-The sensor outputs:
-- `true` (1) when motion is detected
-- `false` (0) when no motion is detected
+### `unit_pir_read(bool *motion_detected)`
 
-The PIR sensor has built-in timing logic that maintains a high output for approximately 2 seconds after detecting motion, then returns to low state if no further motion is detected.
+Reads the current sensor state.
 
-## Hardware Connection
+| Parameter | Description |
+|-----------|-------------|
+| `motion_detected` | Output — `true` if motion is detected, `false` otherwise |
 
-Connect the PIR sensor to Port B of the Core2 for AWS IoT Kit:
-- Signal pin → GPIO 36 (Port B ADC pin)
-- VCC → 5V (or 3.3V depending on sensor requirements)
-- GND → Ground
+**Returns:** `ESP_OK` on success, `ESP_ERR_INVALID_ARG` if pointer is NULL, `ESP_ERR_INVALID_STATE` if not initialized.
+
+### `unit_pir_deinit()`
+
+Resets the GPIO pin to its default state. Call this when the sensor is no longer needed.
+
+**Returns:** `ESP_OK` on success.
 
 ## Integration Example
 
-For applications requiring motion tracking or debouncing, implement this logic in your application layer:
+For applications that need to count motion events (edge detection), implement this in your application layer:
 
 ```c
 void motion_monitoring_task(void *pvParameters) {
-    static uint32_t motion_count = 0;
-    static bool last_state = false;
-    
+    uint32_t motion_count = 0;
+    bool last_state = false;
+
     while (1) {
         bool current_motion = false;
-        
+
         if (unit_pir_read(&current_motion) == ESP_OK) {
-            // Detect rising edge (new motion)
+            // Detect rising edge (new motion event)
             if (current_motion && !last_state) {
                 motion_count++;
-                ESP_LOGI("MOTION", "Motion detected! Count: %lu", motion_count);
+                ESP_LOGI("MOTION", "Motion event #%lu", motion_count);
             }
             last_state = current_motion;
         }
-        
-        vTaskDelay(pdMS_TO_TICKS(100)); // Check every 100ms
+
+        vTaskDelay(pdMS_TO_TICKS(100)); // Poll every 100ms
     }
 }
 ```
 
+## License
+
+Apache 2.0 — see [LICENSE](LICENSE) for details.

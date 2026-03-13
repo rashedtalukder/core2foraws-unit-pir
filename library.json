@@ -1,6 +1,6 @@
 {
     "name": "core2foraws-unit-pir",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Peripheral driver for the PIR motion sensor unit on the Core2 for AWS IoT Kit",
     "keywords": "pir, motion, sensor, detection, m5stack, aws, core2, edukit",
     "repository":
